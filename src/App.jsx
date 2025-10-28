@@ -45,6 +45,69 @@ function App() {
     setFadeIn(false);
 
     try {
+      // Demo mode with sample data when API key is 'demo'
+      if (API_KEY === 'demo') {
+        // Simulate API delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Different weather conditions based on city name for demo
+        const cityLower = city.toLowerCase();
+        let weatherCondition = 'Clear';
+        let description = 'clear sky';
+        let icon = '01d';
+        let temp = 22;
+        
+        if (cityLower.includes('rain') || cityLower.includes('seattle')) {
+          weatherCondition = 'Rain';
+          description = 'light rain';
+          icon = '10d';
+          temp = 15;
+        } else if (cityLower.includes('cloud') || cityLower.includes('london')) {
+          weatherCondition = 'Clouds';
+          description = 'overcast clouds';
+          icon = '04d';
+          temp = 18;
+        } else if (cityLower.includes('snow') || cityLower.includes('moscow')) {
+          weatherCondition = 'Snow';
+          description = 'light snow';
+          icon = '13d';
+          temp = -2;
+        } else if (cityLower.includes('storm') || cityLower.includes('thunder')) {
+          weatherCondition = 'Thunderstorm';
+          description = 'thunderstorm with rain';
+          icon = '11d';
+          temp = 16;
+        }
+        
+        // Sample weather data for demo purposes
+        const demoData = {
+          name: city.charAt(0).toUpperCase() + city.slice(1),
+          sys: { country: 'DEMO' },
+          weather: [
+            { 
+              main: weatherCondition, 
+              description: description,
+              icon: icon
+            }
+          ],
+          main: {
+            temp: temp,
+            feels_like: temp - 2,
+            humidity: 65,
+            pressure: 1013,
+            temp_min: temp - 4,
+            temp_max: temp + 3
+          },
+          wind: {
+            speed: 3.5
+          }
+        };
+        setWeather(demoData);
+        setFadeIn(true);
+        setLoading(false);
+        return;
+      }
+
       const response = await fetch(
         `${API_BASE_URL}?q=${encodeURIComponent(city)}&appid=${API_KEY}&units=metric`
       );
@@ -53,7 +116,7 @@ function App() {
         if (response.status === 404) {
           throw new Error('City not found');
         } else if (response.status === 401) {
-          throw new Error('Invalid API key');
+          throw new Error('Invalid API key. Please set VITE_OPENWEATHER_API_KEY in .env file');
         } else {
           throw new Error('Failed to fetch weather data');
         }
