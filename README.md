@@ -21,7 +21,10 @@ A modern, responsive weather web application built with React, Vite, and Tailwin
   - Snow → Light blue gradient
   - Thunderstorm → Very dark gradient
   - And many more!
-- ✨ **Smooth Animations**: Fade-in effect when weather data loads
+- ✨ **Smooth Animations**: Framer Motion enter/exit transitions for the weather card and a subtle icon scale/fade
+- 🔁 **Loading Indicator**: Lightweight Tailwind spinner displayed during fetches
+- 🌓 **Light/Dark Theme Toggle**: Persistent theme via localStorage using Tailwind's `dark` class
+- 📍 **Use My Location**: Fetch by geolocation (with friendly error messages); optional auto-prompt via env flag
 - 📱 **Fully Responsive**: Works beautifully on desktop, tablet, and mobile devices
 - 🎯 **Modern UI**: Glass-morphism effects with backdrop blur
 - ⚡ **Fast & Lightweight**: Built with Vite for optimal performance
@@ -30,8 +33,8 @@ A modern, responsive weather web application built with React, Vite, and Tailwin
 
 ### Prerequisites
 
-- Node.js (v14 or higher)
-- npm or yarn
+- Node.js (v18 or higher)
+- npm (or yarn/pnpm)
 - OpenWeatherMap API key (free tier available)
 
 ### Installation
@@ -54,12 +57,18 @@ npm install
 
 4. Create a `.env` file in the root directory:
 ```bash
+# macOS/Linux
 cp .env.example .env
+
+# Windows (PowerShell)
+Copy-Item .env.example .env
 ```
 
-5. Add your API key to the `.env` file:
+5. Add your API key to the `.env` file and optional flags:
 ```
 VITE_OPENWEATHER_API_KEY=your_api_key_here
+# VITE_DEMO_MODE=true          # Use canned data without an API key
+# VITE_ENABLE_GEO=true         # Auto-request geolocation on load
 ```
 
 ### Running the Application
@@ -90,6 +99,7 @@ npm run lint
 - **React 18.3** - UI library
 - **Vite 6.0** - Build tool and dev server
 - **TailwindCSS 3.4** - Utility-first CSS framework
+- **Framer Motion** - Lightweight animations
 - **OpenWeatherMap API** - Weather data source
 - **ESLint** - Code linting
 
@@ -102,7 +112,6 @@ skyview-weather/
 │   ├── App.css          # Component-specific styles
 │   ├── main.jsx         # Application entry point
 │   └── index.css        # Global styles with Tailwind directives
-├── public/              # Static assets
 ├── index.html           # HTML template
 ├── vite.config.js       # Vite configuration
 ├── tailwind.config.js   # TailwindCSS configuration
@@ -135,6 +144,18 @@ The app uses the OpenWeatherMap Current Weather Data API:
 - Endpoint: `https://api.openweathermap.org/data/2.5/weather`
 - Units: Metric (Celsius, km/h)
 - Data includes: Temperature, humidity, wind speed, pressure, weather conditions
+
+### Geolocation
+- Click the 📍 button to fetch weather for your current location (works on localhost and HTTPS).
+- Optional: set `VITE_ENABLE_GEO=true` to auto-request location on load.
+- Notes: Browsers require secure origin (HTTPS) for geolocation in production; GitHub Pages is HTTPS by default.
+
+### Deployment (GitHub Pages)
+- A workflow at `.github/workflows/deploy.yml` builds and deploys `dist/` on pushes to `main`.
+- Vite `base` is set to `/skyview-weather/` in `vite.config.js` so assets resolve correctly on Pages.
+- After the first successful run, ensure repository Settings → Pages → Source = GitHub Actions. The site will be available at:
+  - `https://<your-username>.github.io/skyview-weather/`
+  - If you fork/rename, update `base` accordingly in `vite.config.js`.
 
 ## 🤝 Contributing
 

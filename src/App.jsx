@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import './App.css';
 
 const API_KEY = import.meta.env.VITE_OPENWEATHER_API_KEY || '';
 const API_BASE_URL = 'https://api.openweathermap.org/data/2.5/weather';
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true' || !API_KEY;
 const DEMO_DELAY_MS = 1000;
+const GEO_AUTO = import.meta.env.VITE_ENABLE_GEO === 'true';
 
 // Weather condition to gradient mapping
 const weatherGradients = {
@@ -41,7 +43,139 @@ function App() {
   const [weather, setWeather] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [fadeIn, setFadeIn] = useState(false);
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === 'undefined') return 'light';
+    return localStorage.getItem('theme') || 'light';
+  });
+
+  useEffect(() => {
+    const isDark = theme === 'dark';
+    const root = document.documentElement;
+    root.classList.toggle('dark', isDark);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
+
+  // Utility: wrap geolocation in a Promise
+  const getPosition = () => new Promise((resolve, reject) => {
+    if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
+      reject(new Error('Geolocation is not supported by your browser'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve(pos),
+      (err) => reject(err),
+      { enableHighAccuracy: true, maximumAge: 600000, timeout: 10000 }
+    );
+  });
+
+  const fetchWeatherByCoords = async (lat, lon) => {
+    setLoading(true);
+    setError('');
+
+    try {
+      if (DEMO_MODE) {
+        // Simulate API delay
+        await new Promise((r) => setTimeout(r, DEMO_DELAY_MS));
+        // Simple coordinate-based demo mapping
+        let weatherCondition = 'Clear';
+        let description = 'clear sky';
+        let icon = '01d';
+        let temp = 22;
+
+        if (lat > 45) {
+          weatherCondition = 'Snow';
+          description = 'light snow';
+          icon = '13d';
+          temp = -1;
+        } else if (lon > 0) {
+          weatherCondition = 'Rain';
+          description = 'light rain';
+          icon = '10d';
+          temp = 17;
+        } else if (lon < 0) {
+          weatherCondition = 'Clouds';
+          description = 'broken clouds';
+          icon = '04d';
+          temp = 19;
+        }
+
+        const demoData = {
+          name: 'Current Location',
+          sys: { country: 'DEMO' },
+          weather: [{ main: weatherCondition, description, icon }],
+          main: {
+            temp,
+            feels_like: temp - 1,
+            humidity: 60,
+            pressure: 1012,
+            temp_min: temp - 3,
+            temp_max: temp + 2,
+          },
+          wind: { speed: 3.2 },
+        };
+        setWeather(demoData);
+        return;
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('City not found');
+        } else if (response.status === 401) {
+          throw new Error('Invalid API key. Please set VITE_OPENWEATHER_API_KEY in .env file');
+        } else {
+          throw new Error('Failed to fetch weather data');
+        }
+      }
+
+      const data = await response.json();
+      setWeather(data);
+    } catch (err) {
+      if (err && typeof err.code === 'number') {
+        // GeolocationPositionError codes: 1=PERMISSION_DENIED, 2=POSITION_UNAVAILABLE, 3=TIMEOUT
+        if (err.code === 1) {
+          setError('Location permission denied');
+        } else if (err.code === 2) {
+          setError('Unable to determine your location');
+        } else if (err.code === 3) {
+          setError('Location request timed out');
+        } else {
+          setError('Unable to get your location');
+        }
+      } else {
+        setError(err.message || 'Failed to fetch weather data');
+      }
+      setWeather(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUseMyLocation = async () => {
+    try {
+      const pos = await getPosition();
+      const { latitude, longitude } = pos.coords;
+      await fetchWeatherByCoords(latitude, longitude);
+    } catch (e) {
+      // Errors are handled inside fetchWeatherByCoords; capture unsupported browser error here
+      if (e && e.message && e.message.includes('Geolocation')) {
+        setError(e.message);
+      }
+    }
+  };
+
+  // Optional: auto-prompt for location on load when enabled
+  useEffect(() => {
+    if (!GEO_AUTO) return;
+    if (weather || loading) return;
+    handleUseMyLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [GEO_AUTO]);
 
   const fetchWeather = async (e) => {
     e.preventDefault();
@@ -53,7 +187,6 @@ function App() {
 
     setLoading(true);
     setError('');
-    setFadeIn(false);
 
     try {
       // Demo mode with sample data when no API key is provided
@@ -114,7 +247,6 @@ function App() {
           }
         };
         setWeather(demoData);
-        setFadeIn(true);
         setLoading(false);
         return;
       }
@@ -135,7 +267,6 @@ function App() {
 
       const data = await response.json();
       setWeather(data);
-      setFadeIn(true);
     } catch (err) {
       setError(err.message);
       setWeather(null);
@@ -160,6 +291,21 @@ function App() {
     <div className={`min-h-screen flex items-center justify-center transition-all duration-1000 ${getCurrentGradient()}`}>
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto">
+          {/* Top bar: Theme toggle */}
+          <div className="flex justify-end mb-4">
+            <button
+              onClick={toggleTheme}
+              type="button"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-white/20 hover:bg-white/30 text-white backdrop-blur-md shadow-md transition"
+              aria-label="Toggle color theme"
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              <span className="text-lg" role="img" aria-hidden>
+                {theme === 'dark' ? '☀️' : '🌙'}
+              </span>
+              <span className="text-sm font-medium">{theme === 'dark' ? 'Light' : 'Dark'}</span>
+            </button>
+          </div>
           {/* Header */}
           <div className="text-center mb-8">
             <h1 className="text-5xl font-bold text-white mb-2 drop-shadow-lg">
@@ -171,7 +317,7 @@ function App() {
           </div>
 
           {/* Search Form */}
-          <form onSubmit={fetchWeather} className="mb-8">
+          <form onSubmit={fetchWeather} className="mb-4">
             <div className="flex gap-2">
               <input
                 type="text"
@@ -187,8 +333,26 @@ function App() {
               >
                 {loading ? 'Searching...' : 'Search'}
               </button>
+              <button
+                type="button"
+                onClick={handleUseMyLocation}
+                disabled={loading}
+                className="shrink-0 w-14 h-14 rounded-full bg-white/20 hover:bg-white/30 text-white backdrop-blur-md shadow-lg transition disabled:opacity-50"
+                title="Use my location"
+                aria-label="Use my location"
+              >
+                📍
+              </button>
             </div>
           </form>
+
+          {/* Loading indicator */}
+          {loading && (
+            <div className="flex items-center justify-center gap-3 mb-6">
+              <div className="h-6 w-6 rounded-full border-2 border-white/70 border-t-transparent animate-spin"></div>
+              <div className="text-white/90">Fetching weather...</div>
+            </div>
+          )}
 
           {/* Error Message */}
           {error && (
@@ -198,11 +362,17 @@ function App() {
           )}
 
           {/* Weather Data */}
+          <AnimatePresence mode="wait">
           {weather && (
-            <div
-              className={`bg-white bg-opacity-20 backdrop-blur-lg rounded-3xl p-8 shadow-2xl transition-opacity duration-1000 ${
-                fadeIn ? 'opacity-100' : 'opacity-0'
-              }`}
+            <motion.div
+              key={(weather?.name || '') + (weather?.weather?.[0]?.main || '')}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.45, ease: 'easeOut' }}
+              className={
+                'bg-white bg-opacity-20 backdrop-blur-lg rounded-3xl p-8 shadow-2xl'
+              }
             >
               {/* City Name and Weather Icon */}
               <div className="text-center mb-6">
@@ -211,10 +381,13 @@ function App() {
                 </h2>
                 {weather.weather && weather.weather[0] && (
                   <div className="flex items-center justify-center">
-                    <img
+                    <motion.img
                       src={getWeatherIcon(weather.weather[0].icon)}
                       alt={weather.weather[0].description}
                       className="w-32 h-32 drop-shadow-lg"
+                      initial={{ scale: 0.9, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ duration: 0.4, ease: 'easeOut' }}
                     />
                   </div>
                 )}
@@ -276,8 +449,9 @@ function App() {
                   </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
           )}
+          </AnimatePresence>
 
           {/* Initial State - No Data */}
           {!weather && !error && !loading && (
