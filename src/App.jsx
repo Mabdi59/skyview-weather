@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import './App.css';
 
-const API_KEY = import.meta.env.VITE_OPENWEATHER_API_KEY || 'demo';
+const API_KEY = import.meta.env.VITE_OPENWEATHER_API_KEY || '';
 const API_BASE_URL = 'https://api.openweathermap.org/data/2.5/weather';
+const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true' || !API_KEY;
+const DEMO_DELAY_MS = 1000;
 
 // Weather condition to gradient mapping
 const weatherGradients = {
@@ -25,6 +27,15 @@ const weatherGradients = {
 
 const defaultGradient = 'bg-gradient-to-br from-cyan-400 via-cyan-500 to-cyan-600';
 
+// Helper function to convert city names to title case
+const toTitleCase = (str) => {
+  return str
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
 function App() {
   const [city, setCity] = useState('');
   const [weather, setWeather] = useState(null);
@@ -45,10 +56,10 @@ function App() {
     setFadeIn(false);
 
     try {
-      // Demo mode with sample data when API key is 'demo'
-      if (API_KEY === 'demo') {
+      // Demo mode with sample data when no API key is provided
+      if (DEMO_MODE) {
         // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, DEMO_DELAY_MS));
         
         // Different weather conditions based on city name for demo
         const cityLower = city.toLowerCase();
@@ -81,7 +92,7 @@ function App() {
         
         // Sample weather data for demo purposes
         const demoData = {
-          name: city.charAt(0).toUpperCase() + city.slice(1),
+          name: toTitleCase(city),
           sys: { country: 'DEMO' },
           weather: [
             { 
